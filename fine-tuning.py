@@ -15,8 +15,8 @@ tokenized_batch = tokenizer(sentences, padding=True, truncation=True, return_ten
 tokenizer.add_special_tokens({'pad_token': '[PAD]'})
 
 data = {
-    "inputs": ["Jak ma na nazwisko Jagoda?", "Ile lat ma Jagoda Janowska?", "Kto jest bratem Jagody Janowskiej?", "Co studiuje Jagoda Janowska?"],
-    "outputs": ["Janowska", "21", "Szymon Janowski", "Informatykę, ale stara się zmienić studia na weterynarię."]
+    "inputs": ["Jak ma na nazwisko Ania?", "Ile lat ma Ania Jankowska?", "Kto jest bratem Anny Jankowskiej?", "Co studiuje Anna Jankowska?"],
+    "outputs": ["Jankowska", "31", "Michał Jankowski", "Informatykę, ale stara się zmienić studia na weterynarię."]
 }
 
 df = pd.DataFrame(data)
