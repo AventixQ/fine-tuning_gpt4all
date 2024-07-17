@@ -1,48 +1,45 @@
 import pandas as pd
-from datasets import Dataset, load_dataset, concatenate_datasets
+from datasets import Dataset
 from transformers import AutoTokenizer, AutoModelForCausalLM, TrainingArguments, Trainer
+import torch
+import os
+import gc
 
-dataset_hf = load_dataset("nomic-ai/gpt4all-j-prompt-generations", revision="v1.2-jazzy")
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:1024"
 
-model = AutoModelForCausalLM.from_pretrained("nomic-ai/gpt4all-j", revision="v1.2-jazzy")
-tokenizer = AutoTokenizer.from_pretrained('bert-base-uncased')
-sentences = ['This is an example.', 'Another sentence.']
+print(torch.cuda.is_available())
+torch.cuda.empty_cache()
+gc.collect()
 
-tokenized_batch = tokenizer(sentences, padding=True, truncation=True, return_tensors='pt')
+model_name = "gpt2"
+model = AutoModelForCausalLM.from_pretrained(model_name)
+tokenizer = AutoTokenizer.from_pretrained(model_name, padding_side = 'left')
+#model = AutoModelForCausalLM.from_pretrained("nomic-ai/gpt4all-j", revision="v1.2-jazzy")
+#tokenizer = AutoTokenizer.from_pretrained('bert-base-uncased')
 
-#print(tokenized_batch)
-
-tokenizer.add_special_tokens({'pad_token': '[PAD]'})
+if tokenizer.pad_token is None:
+    tokenizer.add_special_tokens({'pad_token': '[PAD]'})
+    model.resize_token_embeddings(len(tokenizer))
 
 data = {
-    "inputs": ["Jak ma na nazwisko Ania?", "Ile lat ma Ania Jankowska?", "Kto jest bratem Anny Jankowskiej?", "Co studiuje Anna Jankowska?"],
-    "outputs": ["Jankowska", "31", "Michał Jankowski", "Informatykę, ale stara się zmienić studia na weterynarię."]
+    "inputs": ["What is surname of Ania from Computer Science in Poznan University of Technology?", "How old is Ania Kowalska?", "Do Anna Kowalska have siblings?", "What is studing Ania Kowalska?"],
+    "outputs": ["Kowalska", "21", "Michał Kowalski", "Computer Science, but she want to become graphic designer."]
 }
 
 df = pd.DataFrame(data)
 dataset_custom = Dataset.from_pandas(df)
 
-dataset = concatenate_datasets([dataset_hf['train'], dataset_custom])
-
-#inputs = ["Jak ma na nazwisko Ania?", "Ile lat ma Jagoda Janowska", "Kto jest bratem Ani Jankowskiej?", "Co studiuje Anna Jankowska?"]
-#outputs = ["Jankowska", "21", "Michał Jankowski", "Informatykę, ale stara się zmienić studia na weterynarię."]
-
 def preprocess_function(examples):
     inputs = [str(inp) for inp in examples['inputs']]
     outputs = [str(out) for out in examples['outputs']]
 
-    #print("Inputs before tokenization:", inputs)
     model_inputs = tokenizer(inputs, max_length=512, truncation=True, padding="max_length", return_tensors="pt")
-    #print("Tokenized inputs:", model_inputs)
-
-    #print("Outputs before tokenization:", outputs)
     labels = tokenizer(outputs, max_length=512, truncation=True, padding="max_length", return_tensors="pt")
-    #print("Tokenized labels:", labels)
 
     model_inputs["labels"] = labels["input_ids"]
     return model_inputs
 
-tokenized_datasets = dataset.map(preprocess_function, batched=True)
+tokenized_datasets = dataset_custom.map(preprocess_function, batched=True)
 
 training_args = TrainingArguments(
     output_dir="./results",
@@ -52,6 +49,8 @@ training_args = TrainingArguments(
     per_device_eval_batch_size=2,
     num_train_epochs=3,
     weight_decay=0.01,
+    gradient_accumulation_steps=4,
+    fp16=True,
 )
 
 trainer = Trainer(
